@@ -1,12 +1,12 @@
 use aoc_runner_derive::{aoc, aoc_generator};
 
 #[aoc_generator(day1)]
-pub fn parse(input: &str) -> Vec<String> {
+fn parse(input: &str) -> Vec<String> {
     input.lines().map(str::to_owned).collect()
 }
 
 #[aoc(day1, part1)]
-pub fn part1(input: &[String]) -> u32 {
+fn part1(input: &[String]) -> u32 {
     input
         .iter()
         .map(|line| {
@@ -69,7 +69,7 @@ impl Iterator for DigitIterator<'_> {
 }
 
 #[aoc(day1, part2)]
-pub fn part2(input: &[String]) -> u32 {
+fn part2(input: &[String]) -> u32 {
     input
         .iter()
         .map(|line| {
