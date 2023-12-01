@@ -1,33 +1,21 @@
-use aoc_runner_derive::{aoc, aoc_generator};
+use aoc_runner_derive::aoc;
 
-#[aoc_generator(day1)]
-fn parse(input: &str) -> Vec<String> {
-    input.lines().map(str::to_owned).collect()
+fn sum_first_last<I>(mut iterator: I) -> u32
+where
+    I: Iterator<Item = u32>,
+{
+    let first = iterator.next().unwrap_or(0);
+    let last = iterator.last().unwrap_or(first);
+    debug_assert!(first < 10);
+    debug_assert!(last < 10);
+    first * 10 + last
 }
 
 #[aoc(day1, part1)]
-fn part1(input: &[String]) -> u32 {
+fn part1(input: &str) -> u32 {
     input
-        .iter()
-        .map(|line| {
-            let digits = line
-                .chars()
-                .filter_map(|c| c.to_digit(10))
-                .fold(None, |acc, item| {
-                    if let Some((first, _)) = acc {
-                        Some((first, item))
-                    } else {
-                        Some((item, item))
-                    }
-                });
-            if let Some((d1, d2)) = digits {
-                debug_assert!(d1 < 10);
-                debug_assert!(d2 < 10);
-                d1 * 10 + d2
-            } else {
-                0
-            }
-        })
+        .lines()
+        .map(|line| sum_first_last(line.chars().filter_map(|c| c.to_digit(10))))
         .sum()
 }
 
@@ -57,9 +45,9 @@ impl Iterator for DigitIterator<'_> {
                 return Some(value);
             } else {
                 let substring = &self.s[i..];
-                for (value, name) in (1..10).zip(&digit_names) {
+                for (value, name) in (1..10_u32).zip(&digit_names) {
                     if substring.starts_with(name) {
-                        return Some(value as u32);
+                        return Some(value);
                     }
                 }
             }
@@ -69,26 +57,10 @@ impl Iterator for DigitIterator<'_> {
 }
 
 #[aoc(day1, part2)]
-fn part2(input: &[String]) -> u32 {
+fn part2(input: &str) -> u32 {
     input
-        .iter()
-        .map(|line| {
-            let digits =
-                DigitIterator::new(line).fold(None, |acc, item| {
-                    if let Some((first, _)) = acc {
-                        Some((first, item))
-                    } else {
-                        Some((item, item))
-                    }
-                });
-            if let Some((d1, d2)) = digits {
-                debug_assert!(d1 < 10);
-                debug_assert!(d2 < 10);
-                d1 * 10 + d2
-            } else {
-                0
-            }
-        })
+        .lines()
+        .map(|line| sum_first_last(DigitIterator::new(line)))
         .sum()
 }
 
@@ -99,12 +71,12 @@ mod tests {
     #[test]
     fn part1_example() {
         assert_eq!(
-            part1(&parse(
+            part1(
                 "1abc2
         pqr3stu8vwx
         a1b2c3d4e5f
         treb7uchet"
-            )),
+            ),
             142
         );
     }
@@ -112,7 +84,7 @@ mod tests {
     #[test]
     fn part2_example() {
         assert_eq!(
-            part2(&parse(
+            part2(
                 "two1nine
         eightwothree
         abcone2threexyz
@@ -120,7 +92,7 @@ mod tests {
         4nineeightseven2
         zoneight234
         7pqrstsixteen"
-            )),
+            ),
             281
         );
     }
@@ -137,8 +109,15 @@ mod tests {
         assert_eq!(digits_in_str("1two3"), vec![1, 2, 3]);
         assert_eq!(digits_in_str("123456789"), vec![1, 2, 3, 4, 5, 6, 7, 8, 9]);
         assert_eq!(
-            digits_in_str("onetwothreefourfivesixseveneightnine",),
+            digits_in_str("onetwothreefourfivesixseveneightnine"),
             vec![1, 2, 3, 4, 5, 6, 7, 8, 9]
         );
+    }
+
+    #[test]
+    fn test_sum_first_last() {
+        assert_eq!(13, sum_first_last([1, 2, 3].into_iter()));
+        assert_eq!(55, sum_first_last([5].into_iter()));
+        assert_eq!(0, sum_first_last([].into_iter()));
     }
 }
