@@ -1,5 +1,7 @@
 use aoc_runner_derive::aoc;
 
+use crate::testing::example_tests;
+
 fn sum_first_last<I>(mut iterator: I) -> u32
 where
     I: Iterator<Item = u32>,
@@ -68,35 +70,6 @@ fn part2(input: &str) -> u32 {
 mod tests {
     use super::*;
 
-    #[test]
-    fn part1_example() {
-        assert_eq!(
-            part1(
-                "1abc2
-        pqr3stu8vwx
-        a1b2c3d4e5f
-        treb7uchet"
-            ),
-            142
-        );
-    }
-
-    #[test]
-    fn part2_example() {
-        assert_eq!(
-            part2(
-                "two1nine
-        eightwothree
-        abcone2threexyz
-        xtwone3four
-        4nineeightseven2
-        zoneight234
-        7pqrstsixteen"
-            ),
-            281
-        );
-    }
-
     fn digits_in_str(s: &str) -> Vec<u32> {
         DigitIterator::new(s).collect()
     }
@@ -120,4 +93,28 @@ mod tests {
         assert_eq!(55, sum_first_last([5].into_iter()));
         assert_eq!(0, sum_first_last([].into_iter()));
     }
+}
+
+example_tests! {
+    parser: None,
+
+    "
+    1abc2
+    pqr3stu8vwx
+    a1b2c3d4e5f
+    treb7uchet
+    ",
+
+    part1 => 142,
+
+    "
+    two1nine
+    eightwothree
+    abcone2threexyz
+    xtwone3four
+    4nineeightseven2
+    zoneight234
+    7pqrstsixteen",
+
+    part2 => 281
 }
