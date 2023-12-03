@@ -1,5 +1,6 @@
 mod day1;
 mod day2;
+mod day3;
 #[macro_use]
 pub(crate) mod testing;
 use aoc_runner_derive::aoc_lib;
