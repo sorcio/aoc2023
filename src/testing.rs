@@ -1,35 +1,42 @@
-use std::ops::Deref;
+use std::{borrow::Borrow, marker::PhantomData};
 
 #[allow(private_bounds)]
-pub(crate) struct CorrectResultTest<'s, Parse, Solve, I, IR, O>
+pub(crate) struct CorrectResultTest<'s, Parse, Solve, T, I, O>
 where
-    Parse: ParserOrNone<'s, Parsed = I>,
-    Solve: FnOnce(&IR) -> O,
-    I: Deref<Target = IR>,
-    IR: ?Sized,
+    Parse: ParserOrNone<'s, T>,
+    I: ?Sized,
+    T: ?Sized,
     O: 'static,
 {
     pub(crate) parser: Parse,
     pub(crate) solver: Solve,
-    pub(crate) example: &'s str,
+    pub(crate) example: &'s T,
     pub(crate) result: &'static O,
+    pub(crate) marker: PhantomData<I>,
 }
 
-trait ParserOrNone<'s> {
+trait ParserOrNone<'s, T: ?Sized> {
     type Parsed;
-    fn parse(self, input: &'s str) -> Self::Parsed;
+    fn parse(self, input: &'s T) -> Self::Parsed;
 }
 
-impl<F: FnOnce(&str) -> I, I> ParserOrNone<'_> for F {
+impl<F: FnOnce(&str) -> I, I> ParserOrNone<'_, str> for F {
     type Parsed = I;
     fn parse(self, input: &str) -> I {
-        self(input)
+        self(&unindent::unindent(input))
     }
 }
 
-impl<'s> ParserOrNone<'s> for Option<()> {
-    type Parsed = &'s str;
-    fn parse(self, input: &'s str) -> &'s str {
+impl<F: FnOnce(&[u8]) -> I, I> ParserOrNone<'_, [u8]> for F {
+    type Parsed = I;
+    fn parse(self, input: &[u8]) -> I {
+        self(&unindent::unindent_bytes(input))
+    }
+}
+
+impl<'s, T: ?Sized + 's> ParserOrNone<'s, T> for Option<()> {
+    type Parsed = &'s T;
+    fn parse(self, input: &'s T) -> &'s T {
         match self {
             Some(_) => panic!("parser should be a function or None"),
             None => input,
@@ -38,18 +45,19 @@ impl<'s> ParserOrNone<'s> for Option<()> {
 }
 
 #[allow(private_bounds)]
-impl<'s, Parse, Solve, I, IR, O> CorrectResultTest<'s, Parse, Solve, I, IR, O>
+impl<'s, Parse, Solve, T, I, O> CorrectResultTest<'s, Parse, Solve, T, I, O>
 where
-    Parse: ParserOrNone<'s, Parsed = I>,
-    Solve: FnOnce(&IR) -> O,
-    I: Deref<Target = IR>,
-    IR: ?Sized,
+    Parse: ParserOrNone<'s, T>,
+    Solve: FnOnce(&I) -> O,
+    Parse::Parsed: Borrow<I>,
+    T: ?Sized,
+    I: ?Sized,
     O: std::cmp::Eq + std::fmt::Debug + 'static,
 {
     #[cfg_attr(not(test), allow(unused))]
     pub(crate) fn test(self) {
         assert_eq!(
-            &(self.solver)(&self.parser.parse(self.example)),
+            &(self.solver)(self.parser.parse(self.example).borrow()),
             self.result
         );
     }
@@ -65,24 +73,22 @@ macro_rules! example_tests {
         *) => {
         #[cfg(test)]
         mod example_tests {
-            #[allow(unused)]
-            const EXAMPLE_DATA: &str = $example_data;
             $(
                 #[test]
                 fn $solver_name() {
                     use $crate::testing::CorrectResultTest;
                     #[allow(unused_variables)]
-                    let example_data = EXAMPLE_DATA;
+                    let example_data = $example_data;
                     $(
                         let example_data = $per_part_example_data;
                     )?
-                    let example_data = unindent::unindent(example_data);
                     {
                     CorrectResultTest {
                         parser: $parser,
                         solver: super::$solver_name,
-                        example: &example_data,
+                        example: example_data,
                         result: &$result,
+                        marker: std::marker::PhantomData,
                     }.test();
                 }
                 }
