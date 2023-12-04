@@ -44,6 +44,22 @@ impl<const A: usize, const B: usize> Card<A, B> {
             .filter(|n| self.own.contains(*n))
             .copied()
     }
+
+    /// score according to part 1
+    fn score(&self) -> usize {
+        match self.own_winning().count() {
+            0 => 0,
+            n => 2_usize.pow((n - 1).try_into().unwrap()),
+        }
+    }
+
+    /// range of cards won by this card (assuming cards are in a stack indexed by id - 1)
+    fn won_range(&self) -> std::ops::Range<usize> {
+        let winning_count = self.own_winning().count();
+        let start = self.id as usize;  // id is always 1 + index
+        let end = start + winning_count;
+        start..end
+    }
 }
 
 #[aoc_generator(day4)]
@@ -80,7 +96,8 @@ fn parse_generic<const A: usize, const B: usize>(input: &[u8]) -> Vec<Card<A, B>
     // SAFETY: obviously none, since we are reading a file and skipping a bunch
     // of checks. But as long as it works and Miri is happy so am I.
     let data = input.as_ptr();
-    let len = input.len() / std::mem::size_of::<Line<A, B>>();
+    // dbg!(input.len(), std::mem::size_of::<Line<A, B>>(), input.len() / std::mem::size_of::<Line<A, B>>());
+    let len = (input.len() + 1) / std::mem::size_of::<Line<A, B>>();
     let records: &[Line<A, B>] = unsafe { std::slice::from_raw_parts(data as _, len) };
     #[cfg(debug_assertions)]
     for record in records {
@@ -101,17 +118,24 @@ fn parse_generic<const A: usize, const B: usize>(input: &[u8]) -> Vec<Card<A, B>
 fn part1_generic<const A: usize, const B: usize>(cards: &[Card<A, B>]) -> usize {
     cards
         .into_iter()
-        .map(|card| match card.own_winning().count() {
-            0 => 0,
-            n => 2_usize.pow((n - 1).try_into().unwrap()),
-        })
+        .map(|card| card.score())
         .sum()
 }
 
-// #[aoc(day4, part2)]
-// fn part2(input: &str) -> String {
-//     todo!()
-// }
+fn part2_generic<const A: usize, const B: usize>(input_cards: &[Card<A, B>]) -> usize {
+    let mut cards = vec![0; input_cards.len()];
+    for i in (0..input_cards.len()).rev() {
+        let won_range = input_cards[i].won_range();
+        cards[i] = won_range.len() + won_range.map(|won_i| cards[won_i]).sum::<usize>();
+    }
+    input_cards.len() + cards.into_iter().sum::<usize>()
+}
+
+#[aoc(day4, part2)]
+fn part2(cards: &[Card<10, 25>]) -> usize {
+    assert!(cards.len() == 201);
+    part2_generic(cards)
+}
 
 #[cfg(test)]
 mod tests {
@@ -156,13 +180,17 @@ mod tests {
 
 #[cfg(test)]
 fn parse_example(input: &[u8]) -> Vec<Card<5, 8>> {
-    println!("--{}--", std::str::from_utf8(input).unwrap());
     parse_generic(input)
 }
 
 #[cfg(test)]
 fn part1_example(cards: &[Card<5, 8>]) -> usize {
     part1_generic(cards)
+}
+
+#[cfg(test)]
+fn part2_example(cards: &[Card<5, 8>]) -> usize {
+    part2_generic(cards)
 }
 
 example_tests! {
@@ -179,5 +207,6 @@ example_tests! {
     Card   6: 31 18 13 56 72 | 74 77 10 23 35 67 36 11
     ",
 
-    part1_example => 13
+    part1_example => 13,
+    part2_example => 30
 }
