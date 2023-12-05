@@ -3,8 +3,15 @@ use aoc_runner_derive::{aoc, aoc_generator};
 use crate::testing::example_tests;
 
 #[repr(transparent)]
-#[derive(Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 struct AsciiNumber<const LEN: usize>([u8; LEN]);
+
+impl<const LEN: usize, T: for<'a> From<&'a AsciiNumber<LEN>> + Ord> PartialEq<T> for AsciiNumber<LEN> {
+    // (only used in tests to compare against literals)
+    fn eq(&self, other: &T) -> bool {
+        T::from(self) == *other
+    }
+}
 
 macro_rules! ascii_to_number {
     ($t:ty) => {
@@ -33,16 +40,15 @@ ascii_to_number!(u16);
 
 struct Card<const A: usize, const B: usize> {
     id: u16,
-    winning: [u8; A],
-    own: [u8; B],
+    winning: [AsciiNumber<2>; A],
+    own: [AsciiNumber<2>; B],
 }
 
 impl<const A: usize, const B: usize> Card<A, B> {
-    fn own_winning(&self) -> impl Iterator<Item = u8> + '_ {
+    fn own_winning(&self) -> impl Iterator<Item = &AsciiNumber<2>> {
         self.winning
             .iter()
             .filter(|n| self.own.contains(*n))
-            .copied()
     }
 
     /// score according to part 1
@@ -108,8 +114,8 @@ fn parse_generic<const A: usize, const B: usize>(input: &[u8]) -> Vec<Card<A, B>
         .iter()
         .map(|record| {
             let id = u16::from(&record.card_id);
-            let winning = record.winning.map(|ascii| ascii.number.into());
-            let own = record.own.map(|ascii| ascii.number.into());
+            let winning = record.winning.map(|ascii| ascii.number);
+            let own = record.own.map(|ascii| ascii.number);
             Card::<A, B> { id, winning, own }
         })
         .collect()
@@ -167,12 +173,12 @@ mod tests {
         let parsed = parse_generic::<10, 25>(include_bytes!("../input/2023/day4.txt"));
         assert_eq!(parsed.len(), 201);
         assert_eq!(parsed[0].id, 1);
-        assert_eq!(parsed[0].winning, [91, 73, 74, 57, 24, 99, 31, 70, 60, 8]);
+        assert_eq!(parsed[0].winning, [91, 73, 74, 57, 24, 99, 31, 70, 60, 8_u8]);
         assert_eq!(
             parsed[0].own,
             [
                 89, 70, 43, 24, 62, 30, 91, 87, 60, 57, 90, 2, 27, 3, 31, 25, 39, 83, 64, 73, 99,
-                8, 74, 37, 49
+                8, 74, 37, 49_u8
             ]
         );
     }
