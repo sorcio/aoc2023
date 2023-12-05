@@ -69,8 +69,10 @@ macro_rules! example_tests {
         $example_data:expr,
         $(
             $($per_part_example_data:literal,)?
-            $solver_name:ident => $result:expr),
-        *) => {
+            $solver_name:ident => $result:expr
+        ),+
+        $(,)?
+    ) => {
         #[cfg(test)]
         mod example_tests {
             $(
@@ -95,7 +97,7 @@ macro_rules! example_tests {
             )*
         }
     };
-    ($example_data:expr, $($solver_name:ident => $result:expr),*) => {
+    ($example_data:expr, $($solver_name:ident => $result:expr),+ $(,)?) => {
         example_tests! {
             parser: super::parse,
             $example_data,
