@@ -106,4 +106,42 @@ macro_rules! example_tests {
     };
 }
 
-pub(crate) use example_tests;
+macro_rules! known_input_tests {
+    (
+        parser: $parser:expr,
+        input: $input:expr,
+        $(
+            $solver_name:ident => $result:expr
+        ),+
+        $(,)?
+    ) => {
+        #[cfg(test)]
+        mod known_input_tests {
+            $(
+                #[test]
+                fn $solver_name() {
+                    use $crate::testing::CorrectResultTest;
+                    let example_data = $input;
+                    {
+                    CorrectResultTest {
+                        parser: $parser,
+                        solver: super::$solver_name,
+                        example: example_data,
+                        result: &$result,
+                        marker: std::marker::PhantomData,
+                    }.test();
+                }
+                }
+            )*
+        }
+    };
+    (input: $input:expr, $($solver_name:ident => $result:expr),+ $(,)?) => {
+        known_input_tests! {
+            parser: super::parse,
+            input: $input,
+            $($solver_name => $result),*
+        }
+    };
+}
+
+pub(crate) use {example_tests, known_input_tests};

@@ -2,7 +2,7 @@ use std::collections::HashSet;
 
 use aoc_runner_derive::{aoc, aoc_generator};
 
-use crate::testing::example_tests;
+use crate::testing::{example_tests, known_input_tests};
 
 #[derive(Debug, Clone, Copy, Hash, PartialEq, Eq)]
 struct GridPos(usize);
@@ -296,4 +296,10 @@ example_tests! {
 
     part1 => 4361,
     part2 => 467835
+}
+
+known_input_tests! {
+    input: include_bytes!("../input/2023/day3.txt"),
+    part1 => 556367,
+    part2 => 89471771,
 }

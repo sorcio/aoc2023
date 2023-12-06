@@ -1,6 +1,6 @@
 use aoc_runner_derive::{aoc, aoc_generator};
 
-use crate::testing::example_tests;
+use crate::testing::{example_tests, known_input_tests};
 
 #[repr(transparent)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -215,4 +215,10 @@ example_tests! {
 
     part1_example => 13,
     part2_example => 30
+}
+
+known_input_tests! {
+    input: include_bytes!("../input/2023/day4.txt"),
+    part1 => 20855,
+    part2 => 5489600,
 }

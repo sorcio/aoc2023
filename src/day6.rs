@@ -1,6 +1,9 @@
 use aoc_runner_derive::{aoc, aoc_generator};
 
-use crate::{range::HasExtent, testing::example_tests};
+use crate::{
+    range::HasExtent,
+    testing::{example_tests, known_input_tests},
+};
 
 #[derive(Debug)]
 struct Race {
@@ -125,4 +128,10 @@ example_tests! {
 
     part1 => 288,
     part2 => 71503,
+}
+
+known_input_tests! {
+    input: include_str!("../input/2023/day6.txt"),
+    part1 => 608902,
+    part2 => 46173809,
 }

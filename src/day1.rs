@@ -1,6 +1,6 @@
 use aoc_runner_derive::aoc;
 
-use crate::testing::example_tests;
+use crate::testing::{example_tests, known_input_tests};
 
 fn sum_first_last<I>(mut iterator: I) -> u32
 where
@@ -117,4 +117,11 @@ example_tests! {
     7pqrstsixteen",
 
     part2 => 281
+}
+
+known_input_tests! {
+    parser: None,
+    input: include_str!("../input/2023/day1.txt"),
+    part1 => 54159,
+    part2 => 53866,
 }

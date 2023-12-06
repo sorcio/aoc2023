@@ -1,4 +1,7 @@
-use crate::range::{Interval, Overlaps};
+use crate::{
+    range::{Interval, Overlaps},
+    testing::known_input_tests,
+};
 
 // forgive me but I renamed things later and I don't want to change the whole code
 type Range = Interval<u32>;
@@ -388,4 +391,10 @@ example_tests! {
 
     part1 => 35,
     part2 => 46,
+}
+
+known_input_tests! {
+    input: include_str!("../input/2023/day5.txt"),
+    part1 => 324724204,
+    part2 => 104070862,
 }

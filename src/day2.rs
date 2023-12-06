@@ -1,6 +1,6 @@
 use aoc_runner_derive::{aoc, aoc_generator};
 
-use crate::testing::example_tests;
+use crate::testing::{example_tests, known_input_tests};
 
 #[derive(Debug)]
 struct Game {
@@ -128,4 +128,10 @@ example_tests! {
 
     part1 => 8,
     part2 => 2286
+}
+
+known_input_tests! {
+    input: include_str!("../input/2023/day2.txt"),
+    part1 => 2149,
+    part2 => 71274,
 }
