@@ -1,6 +1,6 @@
 use aoc_runner_derive::{aoc, aoc_generator};
 
-use crate::testing::example_tests;
+use crate::{range::HasExtent, testing::example_tests};
 
 #[derive(Debug)]
 struct Race {
@@ -9,7 +9,7 @@ struct Race {
 }
 
 impl Race {
-    fn press_time_to_beat_record(&self) -> std::ops::Range<usize> {
+    fn press_time_to_beat_record(&self) -> std::ops::Range<u64> {
         // solutions to inequality x * (time - x) > record_distance
         //
         // T/2 -+ sqrt(T^2 - 4D)/2
@@ -29,8 +29,8 @@ impl Race {
     }
 }
 
-fn int_larger_than_float(n: f64) -> usize {
-    let n_int = n.ceil() as usize;
+fn int_larger_than_float(n: f64) -> u64 {
+    let n_int = n.ceil() as u64;
     if n.fract() == 0.0 {
         n_int + 1
     } else {
@@ -38,8 +38,8 @@ fn int_larger_than_float(n: f64) -> usize {
     }
 }
 
-fn int_smaller_than_float(n: f64) -> usize {
-    let n_int = n.floor() as usize;
+fn int_smaller_than_float(n: f64) -> u64 {
+    let n_int = n.floor() as u64;
     if n.fract() == 0.0 {
         n_int - 1
     } else {
@@ -82,15 +82,27 @@ fn part1(input: &[Race]) -> u64 {
     }
     input
         .iter()
-        .map(|race| race.press_time_to_beat_record().len() as u64)
+        .map(|race| race.press_time_to_beat_record().extent())
         .fold(1, std::ops::Mul::mul)
 }
 
 fn join_times(races: &[Race]) -> Race {
     // we could have a parser specific for part 2 but it's not a fun exercise so
     // I won't even bother and just take the already parsed result.
-    let time: u64 = races.iter().map(|race| format!("{}", race.time)).collect::<Vec<_>>().join("").parse().unwrap();
-    let record_distance: u64 = races.iter().map(|race| format!("{}", race.record_distance)).collect::<Vec<_>>().join("").parse().unwrap();
+    let time: u64 = races
+        .iter()
+        .map(|race| format!("{}", race.time))
+        .collect::<Vec<_>>()
+        .join("")
+        .parse()
+        .unwrap();
+    let record_distance: u64 = races
+        .iter()
+        .map(|race| format!("{}", race.record_distance))
+        .collect::<Vec<_>>()
+        .join("")
+        .parse()
+        .unwrap();
     Race {
         time,
         record_distance,
@@ -99,7 +111,7 @@ fn join_times(races: &[Race]) -> Race {
 #[aoc(day6, part2)]
 fn part2(input: &[Race]) -> u64 {
     let race = join_times(input);
-    race.press_time_to_beat_record().len() as u64
+    race.press_time_to_beat_record().extent()
 }
 
 #[cfg(test)]

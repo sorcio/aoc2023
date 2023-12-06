@@ -1,4 +1,7 @@
-use crate::range::{Overlaps, Range};
+use crate::range::{Interval, Overlaps};
+
+// forgive me but I renamed things later and I don't want to change the whole code
+type Range = Interval<u32>;
 
 #[derive(Debug, Clone)]
 struct MappedRange {
