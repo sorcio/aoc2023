@@ -93,12 +93,11 @@ fn parse(input: &str) -> Vec<Game> {
 
 #[aoc(day2, part1)]
 fn part1(input: &[Game]) -> u32 {
-    let limit =
-        Colors {
-            r: 12,
-            g: 13,
-            b: 14,
-        };
+    let limit = Colors {
+        r: 12,
+        g: 13,
+        b: 14,
+    };
     input
         .iter()
         .map(|game| {
