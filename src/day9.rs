@@ -1,6 +1,6 @@
 use aoc_runner_derive::{aoc, aoc_generator};
 
-use crate::testing::example_tests;
+use crate::testing::{example_tests, known_input_tests};
 
 #[aoc_generator(day9)]
 fn parse(input: &str) -> Vec<Vec<i64>> {
@@ -92,4 +92,8 @@ example_tests! {
     part2 => 2,
 }
 
-// 1725987467
+known_input_tests! {
+    input: include_str!("../input/2023/day9.txt"),
+    part1 => 1725987467,
+    part2 => 971,
+}
