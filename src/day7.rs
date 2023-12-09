@@ -204,7 +204,7 @@ fn part1_impl(input: &[Bid]) -> u32 {
 
 fn part2_impl(input: &[Bid]) -> u32 {
     let mut bids: Vec<_> = input
-        .into_iter()
+        .iter()
         .map(|bid| (bid.clone().hand.with_joker(), bid.bid_value))
         .collect();
     bids.sort_by(|a, b| a.0.cmp(&b.0));
