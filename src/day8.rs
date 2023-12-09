@@ -217,6 +217,37 @@ fn part2(input: &Day8Map) -> usize {
         .fold(1, least_common_multiple)
 }
 
+#[aoc(day8, part2, brute_force)]
+fn part2_brute_force(input: &Day8Map) -> usize {
+    // including the brute force solution because it's the first one I wrote and
+    // it actually found the result in reasonable time
+    let sequence = &input.sequence;
+
+    let destinations: Vec<_> = input
+        .network
+        .nodes()
+        .map(|node_id| input.network.sequence(node_id, sequence))
+        .collect();
+
+    let start_nodes = input
+        .network
+        .nodes()
+        .filter(|&node_id| input.network.node(node_id).node_type == NodeType::Start);
+
+    let mut total_steps = 0;
+    let mut current_nodes: Vec<_> = start_nodes.collect();
+    while current_nodes
+        .iter()
+        .any(|&node_id| input.network.node(node_id).node_type != NodeType::End)
+    {
+        for node_id in &mut current_nodes {
+            *node_id = destinations[node_id.0];
+        }
+        total_steps += sequence.len();
+    }
+    total_steps
+}
+
 example_tests! {
     "
     LLR
@@ -228,6 +259,7 @@ example_tests! {
 
     part1 => 6,
     part2 => 6,
+    part2_brute_force => 6,
 }
 
 known_input_tests! {
