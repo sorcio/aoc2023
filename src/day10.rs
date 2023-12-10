@@ -97,7 +97,6 @@ impl GridCell {
     }
 }
 
-#[derive(Debug)]
 struct Grid {
     grid: Vec<GridCell>,
     width: usize,
@@ -105,9 +104,18 @@ struct Grid {
     start_pos: GridPos,
 }
 
+impl std::fmt::Debug for Grid {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("Grid")
+            .field("width", &self.width)
+            .field("height", &self.height)
+            .field("start_pos", &self.start_pos)
+            .finish()
+    }
+}
+
 impl FromIterator<char> for Grid {
     fn from_iter<I: IntoIterator<Item = char>>(iter: I) -> Self {
-        let mut height = 0;
         let mut start_pos = None;
         let mut x = 0;
         let mut y = 0;
@@ -115,19 +123,24 @@ impl FromIterator<char> for Grid {
             .into_iter()
             .filter_map(|c| {
                 if c == '\n' {
-                    height += 1;
                     x = 0;
                     y += 1;
                     None
                 } else {
                     if c == 'S' {
+                        assert!(start_pos.is_none());
                         start_pos = Some(GridPos { x, y });
                     }
+                    x += 1;
                     Some(c.into())
                 }
             })
             .collect();
+        let height = if x == 0 { y } else { y + 1 };
         let width = grid.len() / height;
+        // dbg!(x, y, width, height, grid.len());
+        assert_eq!(grid.len() % height, 0);
+        assert_eq!(grid.len(), width * height);
         Self {
             grid,
             width,
@@ -142,15 +155,13 @@ impl Grid {
         // find the two starting positions adjacent to start_pos
         let mut walker1 = None;
         let mut walker2 = None;
-        dbg!(self.start_pos);
-        for pos in Direction::directions()
+        for (dir, pos) in Direction::directions()
             .into_iter()
-            .filter_map(|dir| self.adjacent(self.start_pos, dir))
+            .filter_map(|dir| Some((dir, self.adjacent(self.start_pos, dir)?)))
         {
-            dbg!(pos);
             for &exit in self.cell(pos).exits() {
-                dbg!(exit);
-                if self.adjacent(pos, exit) == Some(self.start_pos) {
+                if exit == dir.opposite() {
+                // if self.adjacent(pos, exit) == Some(self.start_pos) {
                     let walker = Walker {
                         grid: self,
                         pos,
@@ -166,18 +177,17 @@ impl Grid {
                 }
             }
         }
-        dbg!(&walker1, &walker2);
         (walker1.unwrap(), walker2.unwrap())
     }
 
     fn cell(&self, pos: GridPos) -> &GridCell {
-        debug_assert!(self.contains(pos));
+        debug_assert!(self.contains(pos), "{pos:?} out of bounds");
         &self.grid[pos.y * self.width + pos.x]
     }
 
     fn adjacent(&self, pos: GridPos, dir: Direction) -> Option<GridPos> {
         let pos = pos.apply(dir)?;
-        self.contains(pos).then(|| pos)
+        self.contains(pos).then_some(pos)
     }
 
     fn contains(&self, pos: GridPos) -> bool {
@@ -233,31 +243,47 @@ mod tests {
     use super::*;
 
     #[test]
+    fn parse_trailing_newline() {
+        let grid = parse("....\n.S..\n....\n");
+        assert_eq!(grid.width, 4);
+        assert_eq!(grid.height, 3);
+        assert_eq!(grid.start_pos, GridPos { x: 1, y: 1 });
+    }
+
+    #[test]
+    fn parse_without_trailing_newline() {
+        let grid = parse("....\n.S..\n....");
+        assert_eq!(grid.width, 4);
+        assert_eq!(grid.height, 3);
+        assert_eq!(grid.start_pos, GridPos { x: 1, y: 1 });
+    }
+
+    #[test]
     fn minimal_loop() {
         let grid = parse(&unindent::unindent(
             "
-            S-7
-            |.|
-            L-J
+            .S-7
+            .|.|
+            .L-J
             ",
         ));
         let (mut walker1, mut walker2) = grid.walk_from_start();
         // let's benefit from our naming convention to deterministically know which walker is which
-        assert_eq!(walker1.pos, GridPos { x: 1, y: 0 });
-        assert_eq!(walker2.pos, GridPos { x: 0, y: 1 });
-        walker1.step();
-        walker2.step();
         assert_eq!(walker1.pos, GridPos { x: 2, y: 0 });
-        assert_eq!(walker2.pos, GridPos { x: 0, y: 2 });
+        assert_eq!(walker2.pos, GridPos { x: 1, y: 1 });
         walker1.step();
         walker2.step();
-        assert_eq!(walker1.pos, GridPos { x: 2, y: 1 });
+        assert_eq!(walker1.pos, GridPos { x: 3, y: 0 });
         assert_eq!(walker2.pos, GridPos { x: 1, y: 2 });
         walker1.step();
         walker2.step();
-        assert_eq!(walker1.pos, walker2.pos);
-        assert_eq!(walker1.pos, GridPos { x: 2, y: 2 });
+        assert_eq!(walker1.pos, GridPos { x: 3, y: 1 });
         assert_eq!(walker2.pos, GridPos { x: 2, y: 2 });
+        walker1.step();
+        walker2.step();
+        assert_eq!(walker1.pos, walker2.pos);
+        assert_eq!(walker1.pos, GridPos { x: 3, y: 2 });
+        assert_eq!(walker2.pos, GridPos { x: 3, y: 2 });
         assert_eq!(part1(&grid), 4);
     }
 }
