@@ -1,5 +1,3 @@
-use std::collections::HashSet;
-
 use aoc_runner_derive::{aoc, aoc_generator};
 
 use crate::testing::{example_tests, known_input_tests};
@@ -214,6 +212,14 @@ impl Grid {
     fn contains(&self, pos: GridPos) -> bool {
         pos.x < self.width && pos.y < self.height
     }
+
+    fn make_color_grid(&self) -> ColorGrid {
+        ColorGrid {
+            grid: vec![CellColor::Unknown; self.width * self.height],
+            width: self.width,
+            height: self.height,
+        }
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -224,15 +230,19 @@ struct Walker<'g> {
 }
 
 impl<'g> Walker<'g> {
-    fn step(&mut self) {
-        let dir = self
-            .grid
+    fn next_direction(&self) -> Direction {
+        self.grid
             .cell(self.pos)
             .exits()
             .iter()
             .find(|&&dir| dir != self.come_from)
-            .unwrap();
-        self.pos = self.pos.apply(*dir).unwrap();
+            .copied()
+            .unwrap()
+    }
+
+    fn step(&mut self) {
+        let dir = self.next_direction();
+        self.pos = self.pos.apply(dir).unwrap();
         self.come_from = dir.opposite();
     }
 }
@@ -254,13 +264,11 @@ fn part1(grid: &Grid) -> usize {
     steps
 }
 
+#[cfg(feature = "extra-debug-prints")]
 fn print_loop_grid(grid: &Grid, loop_positions: &[GridPos]) {
     let max_x = loop_positions.iter().map(|pos| pos.x).max().unwrap();
     let max_y = loop_positions.iter().map(|pos| pos.y).max().unwrap();
-    println!(
-        "{}",
-        std::iter::repeat("-").take(grid.width).collect::<String>()
-    );
+    println!("{}", "-".repeat(grid.width));
     for y in 0..=max_y {
         for x in 0..=max_x {
             let pos = GridPos { x, y };
@@ -281,17 +289,93 @@ fn print_loop_grid(grid: &Grid, loop_positions: &[GridPos]) {
         }
         println!();
     }
+    println!("{}", "-".repeat(grid.width));
 }
 
-#[aoc(day10, part2)]
+#[cfg(feature = "draw-visuals")]
+fn draw_loop_as_svg_path(grid: &Grid, loop_positions: &[GridPos], inside_cells: &[GridPos]) {
+    let mut path = String::new();
+    let mut first = true;
+    for &pos in loop_positions {
+        if first {
+            path.push_str(&format!("M {},{}", pos.x, pos.y));
+            first = false;
+        } else {
+            path.push_str(&format!(" L {},{}", pos.x, pos.y));
+        }
+    }
+    path.push_str(" Z");
+
+    let mut svg = String::new();
+    svg.push_str(&format!(
+        "<svg viewBox=\"0 0 {} {}\" xmlns=\"http://www.w3.org/2000/svg\">",
+        grid.width, grid.height
+    ));
+    svg.push_str(&format!(
+        "<path d=\"{}\" fill=\"black\" stroke=\"red\" stroke-width=\"0.9\" />",
+        path
+    ));
+
+    for &pos in inside_cells {
+        svg.push_str(&format!(
+            "<circle cx=\"{}\" cy=\"{}\" r=\"0.4\" stroke=\"yellow\" stroke-width=\"0.1\" fill=\"blue\" />",
+            pos.x, pos.y
+        ));
+    }
+
+    svg.push_str("</svg>");
+    std::fs::write("day10.svg", svg).unwrap();
+}
+
+#[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
+enum CellColor {
+    #[default]
+    Unknown,
+    Boundary,
+    Inside,
+}
+
+impl CellColor {
+    fn is_visited(self) -> bool {
+        self != Self::Unknown
+    }
+}
+
+/// A grid used to compute the inside of the loop. Each color represents what we
+/// know about a cell.
+struct ColorGrid {
+    grid: Vec<CellColor>,
+    width: usize,
+    height: usize,
+}
+
+impl ColorGrid {
+    fn contains(&self, pos: GridPos) -> bool {
+        pos.x < self.width && pos.y < self.height
+    }
+
+    fn cell(&self, pos: GridPos) -> &CellColor {
+        debug_assert!(self.contains(pos), "{pos:?} out of bounds");
+        &self.grid[pos.y * self.width + pos.x]
+    }
+
+    fn cell_mut(&mut self, pos: GridPos) -> &mut CellColor {
+        debug_assert!(self.contains(pos), "{pos:?} out of bounds");
+        &mut self.grid[pos.y * self.width + pos.x]
+    }
+}
+
 fn part2_turns(grid: &Grid) -> usize {
     let (walker1, walker2) = grid.walk_from_start();
 
-    // first, let's collect all the positions of the loop
+    // first, let's mark all the positions of the loop and find out turn
+    // direction of loop (cw or ccw)
     let mut collect_walker = walker1.clone();
-    let mut loop_positions = vec![grid.start_pos, collect_walker.pos];
+    let mut color_grid = grid.make_color_grid();
+    *color_grid.cell_mut(grid.start_pos) = CellColor::Boundary;
     let mut cw_turn_count = 0isize;
     while collect_walker.pos != grid.start_pos {
+        *color_grid.cell_mut(collect_walker.pos) = CellColor::Boundary;
         let dir1 = collect_walker.come_from.opposite();
         collect_walker.step();
         let dir2 = collect_walker.come_from.opposite();
@@ -300,172 +384,52 @@ fn part2_turns(grid: &Grid) -> usize {
         } else if dir2.clockwise() == dir1 {
             cw_turn_count -= 1;
         }
-        loop_positions.push(collect_walker.pos);
     }
-
-    dbg!(cw_turn_count);
-    print_loop_grid(grid, &loop_positions);
 
     // let's decide which walker is the clockwise walker
     let mut walker = if cw_turn_count >= 0 { walker1 } else { walker2 };
-    println!("clockwise is {start_pos:?} -> {second_pos:?}", start_pos = grid.start_pos, second_pos = walker.pos);
 
     // now, let's walk the loop clockwise and collect the positions that are on the inside
     let mut queue = Vec::new();
     while walker.pos != grid.start_pos {
-        let inside_dir = walker.come_from.opposite().clockwise();
-        if let Some(inside) = grid.adjacent(walker.pos, inside_dir) {
-            if !loop_positions.contains(&inside) {
-                println!(
-                    "{inside:?} is inside ({pos:?} -> {inside_dir:?})",
-                    pos = walker.pos
-                );
-                queue.push(inside);
+        let forward_dir = walker.next_direction();
+        let mut inside_dir = forward_dir.clockwise();
+        while inside_dir != walker.come_from {
+            if let Some(adj) = grid.adjacent(walker.pos, inside_dir) {
+                if !color_grid.cell(adj).is_visited() {
+                    queue.push(adj);
+                }
+            } else {
+                panic!("inside direction should be inside map");
             }
-        } else {
-            dbg!(walker.pos, inside_dir);
-            panic!("inside direction should be inside map")
+            inside_dir = inside_dir.clockwise();
         }
-
-        // match grid.cell(walker.pos) {
-        //     GridCell::UpDown | GridCell::RightLeft => {
-        //         let inside_dir = walker.come_from.opposite().clockwise();
-        //         if let Some(inside) = grid.adjacent(walker.pos, inside_dir) {
-        //             queue.push(inside);
-        //         } else {
-        //             // is this a bug?
-        //             dbg!(walker.pos, inside_dir);
-        //             panic!("inside direction should be inside map")
-        //         }
-        //     }
-        //     _ => {}
-        // }
         walker.step();
     }
 
-    let mut visited: HashSet<_> = loop_positions.iter().copied().collect();
     let mut inside_count = 0;
     while let Some(pos) = queue.pop() {
-        if visited.contains(&pos) {
+        if color_grid.cell(pos).is_visited() {
             continue;
         }
-        visited.insert(pos);
+        *color_grid.cell_mut(pos) = CellColor::Inside;
         inside_count += 1;
         for &dir in Direction::directions().iter() {
             if let Some(adj) = grid.adjacent(pos, dir) {
-                if !visited.contains(&adj) {
+                if !color_grid.cell(adj).is_visited() {
                     queue.push(adj);
                 }
             }
         }
     }
+
+    #[cfg(feature = "draw-visuals")]
+    draw_loop_as_svg_path(grid, &loop_positions, &inside);
+
     inside_count
 }
 
-// #[aoc(day10, part2, flood_fill)]
-fn part2_flood_fill(grid: &Grid) -> usize {
-    let (walker1, walker2) = grid.walk_from_start();
-
-    let loop_start_exits = [walker1.come_from.opposite(), walker2.come_from.opposite()];
-
-    // first, let's collect all the positions of the loop
-    let mut collect_walker = walker1.clone();
-    let mut loop_positions = vec![grid.start_pos, collect_walker.pos];
-    // let mut cw_turn_count = 0isize;
-    while collect_walker.pos != grid.start_pos {
-        // let dir1 = collect_walker.come_from.opposite();
-        collect_walker.step();
-        // let dir2 = collect_walker.come_from.opposite();
-        // if dir1.clockwise() == dir2 {
-        //     cw_turn_count += 1;
-        // } else if dir2.clockwise() == dir1 {
-        //     cw_turn_count -= 1;
-        // }
-        loop_positions.push(collect_walker.pos);
-    }
-
-    // find a position on the border of the grid which is definitely outside the loop
-    // (this will break if the loop encloses the whole grid but let's forget about that case)
-    let boundary: HashSet<_> = loop_positions.iter().copied().collect();
-    // let flood_start = (0..grid.width)
-    //     .map(|x| GridPos { x, y: 0 })
-    //     .filter(|&pos| !boundary.contains(&pos))
-    //     .unwrap();
-
-    let mut stack = vec![];
-    for &x in &[0, grid.width - 1] {
-        for &y in &[0, grid.height - 1] {
-            let pos = GridPos { x, y };
-            if !boundary.contains(&pos) {
-                stack.push((0, false, pos));
-            }
-        }
-    }
-
-    // let mut stack = vec![(0, flood_start)];
-    let mut visited = HashSet::new();
-    // visited.insert(grid.start_pos);
-    let mut count_inside = 0usize;
-    while let Some((number, on_boundary, pos)) = stack.pop() {
-        if visited.contains(&pos) {
-            continue;
-        }
-        visited.insert(pos);
-        debug_assert_eq!(on_boundary, boundary.contains(&pos));
-        if (number & 1) == 1 && !on_boundary {
-            println!("{pos:?} is inside ({number})");
-            count_inside += 1;
-        }
-
-        let exits = if pos == grid.start_pos {
-            &loop_start_exits
-        } else {
-            grid.cell(pos).exits()
-        };
-        for &dir in Direction::directions()
-            .iter()
-            .filter(|&&dir| !exits.contains(&dir))
-        {
-            if let Some(adj) = grid.adjacent(pos, dir) {
-                let new_pos_on_boundary = boundary.contains(&adj);
-                if on_boundary {
-                    stack.push((number + 1, new_pos_on_boundary, adj));
-                } else {
-                    stack.push((number, new_pos_on_boundary, adj));
-                }
-            }
-        }
-
-        // for dx in &[-1, 0, 1] {
-        //     if pos.x == 0 && *dx == -1 {
-        //         continue;
-        //     }
-        //     for dy in &[-1, 0, 1] {
-        //         if pos.y == 0 && *dy == -1 {
-        //             continue;
-        //         }
-        //         if dx == &0 && dy == &0 {
-        //             continue;
-        //         }
-        //         let adj = GridPos {
-        //             x: (pos.x as isize + dx) as usize,
-        //             y: (pos.y as isize + dy) as usize,
-        //         };
-        //         if grid.contains(adj) {
-        //             if on_boundary {
-        //                 stack.push((number + 1, adj));
-        //             } else {
-        //                 stack.push((number, adj));
-        //             }
-        //         }
-        //     }
-        // }
-        stack.sort_by_key(|(n, _, _)| -*n);
-    }
-    count_inside
-}
-
-#[allow(dead_code)]
+#[aoc(day10, part2)]
 fn part2(grid: &Grid) -> usize {
     part2_turns(grid)
 }
@@ -643,6 +607,22 @@ mod tests {
     }
 
     #[test]
+    fn tricky_loop5_fill() {
+        // reproducer for a bug we found in the turns-based algorithm: there is only
+        // one cell inside the loop, which is only adjacent to corner cells
+        let grid = parse(&unindent::unindent(
+            "
+            .F7..
+            .|L-7
+            FJ.FJ
+            S-7|.
+            ..LJ.
+            ",
+        ));
+        assert_eq!(part2(&grid), 1);
+    }
+
+    #[test]
     fn example_loop_fill() {
         let grid = parse(&unindent::unindent(
             "
@@ -674,7 +654,6 @@ mod tests {
             ",
         ));
         assert_eq!(part2(&grid), 4);
-
 
         let grid = parse(&unindent::unindent(
             "
@@ -741,4 +720,5 @@ example_tests! {
 known_input_tests! {
     input: include_str!("../input/2023/day10.txt"),
     part1 => 6820,
+    part2 => 337,
 }
