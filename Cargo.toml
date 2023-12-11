@@ -9,3 +9,9 @@ edition = "2021"
 aoc-runner = "0.3.0"
 aoc-runner-derive = "0.3.0"
 unindent = "0.2.3"
+
+[features]
+default = []
+more-debug = []
+extra-debug-prints = ["more-debug"]
+draw-visuals = ["more-debug"]

@@ -368,6 +368,20 @@ impl ColorGrid {
 fn part2_turns(grid: &Grid) -> usize {
     let (walker1, walker2) = grid.walk_from_start();
 
+    #[cfg(feature = "more-debug")]
+    let loop_positions = {
+        let mut collect_walker = walker1.clone();
+        let mut loop_positions = vec![grid.start_pos];
+        while collect_walker.pos != grid.start_pos {
+            loop_positions.push(collect_walker.pos);
+            collect_walker.step();
+        }
+        loop_positions
+    };
+
+    #[cfg(feature = "extra-debug-prints")]
+    print_loop_grid(grid, &loop_positions);
+
     // first, let's mark all the positions of the loop and find out turn
     // direction of loop (cw or ccw)
     let mut collect_walker = walker1.clone();
@@ -407,6 +421,9 @@ fn part2_turns(grid: &Grid) -> usize {
         walker.step();
     }
 
+    #[cfg(feature = "more-debug")]
+    let mut inside = Vec::new();
+
     let mut inside_count = 0;
     while let Some(pos) = queue.pop() {
         if color_grid.cell(pos).is_visited() {
@@ -414,6 +431,10 @@ fn part2_turns(grid: &Grid) -> usize {
         }
         *color_grid.cell_mut(pos) = CellColor::Inside;
         inside_count += 1;
+
+        #[cfg(feature = "more-debug")]
+        inside.push(pos);
+
         for &dir in Direction::directions().iter() {
             if let Some(adj) = grid.adjacent(pos, dir) {
                 if !color_grid.cell(adj).is_visited() {
