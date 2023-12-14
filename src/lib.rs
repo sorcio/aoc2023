@@ -15,6 +15,7 @@ mod range;
 
 #[macro_use]
 pub(crate) mod testing;
+#[macro_use]
 mod utils;
 use aoc_runner_derive::aoc_lib;
 
