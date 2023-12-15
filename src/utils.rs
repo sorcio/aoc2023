@@ -51,6 +51,13 @@ pub(crate) trait AsciiUtils<'a> {
     /// Iterate over the lines in a slice of ASCII bytes
     fn ascii_lines(&self) -> Self::Lines;
 
+    /// Returns a byte slice with trailing ASCII whitespace bytes removed.
+    ///
+    /// The standard library has an equivalent method called `trim_ascii_end`,
+    /// but it's not stable yet as of Rust 1.74
+    /// ([rust-lang/rust#94035](https://github.com/rust-lang/rust/issues/94035)).
+    fn ascii_trim_end(self) -> Self;
+
     fn parse<'f, F>(self) -> Result<F, F::Error>
     where
         F: FromAscii<Slice<'f> = Self>,
@@ -85,6 +92,20 @@ impl<'a> AsciiUtils<'a> for &'a [u8] {
     type Lines = LinesIterator<'a>;
     fn ascii_lines(&self) -> LinesIterator<'a> {
         LinesIterator::new(self)
+    }
+
+    fn ascii_trim_end(self) -> &'a [u8] {
+        // Note: implementation is ripped from Rust standard library, but
+        // without the const marker because it's not allowed for trait methods.
+        let mut bytes = self;
+        while let [rest @ .., last] = bytes {
+            if last.is_ascii_whitespace() {
+                bytes = rest;
+            } else {
+                break;
+            }
+        }
+        bytes
     }
 }
 
