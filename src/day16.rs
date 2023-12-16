@@ -366,6 +366,7 @@ example_tests! {
     ..//.|....
     ",
     part1 => 46,
+    part2 => 51,
 }
 
 known_input_tests! {
