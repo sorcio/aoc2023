@@ -4,7 +4,7 @@ use aoc_runner_derive::{aoc, aoc_generator};
 
 use crate::testing::{example_tests, known_input_tests};
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum Condition {
     Unconditional,
     GreaterThan(char, u32),
@@ -22,6 +22,15 @@ impl Condition {
             '>' => Condition::GreaterThan(variable, value),
             '<' => Condition::LessThan(variable, value),
             _ => panic!("Invalid operator: {}", operator),
+        }
+    }
+
+    fn invert(&self) -> Self {
+        // x > 10 becomes x <= 10 which is equivalent to x < 11
+        match self {
+            Condition::Unconditional => Condition::Unconditional,
+            Condition::GreaterThan(variable, value) => Condition::LessThan(*variable, *value + 1),
+            Condition::LessThan(variable, value) => Condition::GreaterThan(*variable, *value - 1),
         }
     }
 
@@ -48,7 +57,6 @@ struct Rule {
 }
 
 #[derive(Debug, Clone)]
-
 struct Workflow {
     #[allow(unused)]
     label: String,
@@ -92,7 +100,7 @@ where
     let mut workflow_map = HashMap::new();
     let mut entry_point = None;
     for (i, line) in lines.enumerate() {
-        let mut parts = line.split("{");
+        let mut parts = line.split('{');
         let label = parts.next().unwrap();
         let index = i as u32;
         if label == "in" {
@@ -108,9 +116,9 @@ where
         .iter()
         .map(|(label, raw_rules)| {
             let rules = raw_rules
-                .split(",")
+                .split(',')
                 .map(|raw_rule| {
-                    let mut parts = raw_rule.split(":");
+                    let mut parts = raw_rule.split(':');
                     let first_part = parts.next().unwrap();
                     let (condition, raw_target) = if let Some(target) = parts.next() {
                         (Condition::parse(first_part), target)
@@ -171,6 +179,16 @@ impl Item {
         }
     }
 
+    fn set(&mut self, variable: char, value: u32) {
+        match variable {
+            'x' => self.x = value,
+            'm' => self.m = value,
+            'a' => self.a = value,
+            's' => self.s = value,
+            _ => panic!("Invalid variable: {}", variable),
+        }
+    }
+
     fn value(&self) -> u32 {
         self.x + self.m + self.a + self.s
     }
@@ -194,17 +212,251 @@ fn part1(input: &Input) -> u32 {
     input
         .items
         .iter()
-        .filter_map(|item| input.program.accept_item(item).then(|| item.value()))
+        .filter(|&item| input.program.accept_item(item))
+        .map(|item| item.value())
         .sum()
 }
 
+#[derive(Debug, Clone)]
+struct Bounds {
+    lower: Item,
+    upper: Item,
+}
+
+impl Bounds {
+    fn new(lower: u32, upper: u32) -> Self {
+        Self {
+            lower: Item {
+                x: lower,
+                m: lower,
+                a: lower,
+                s: lower,
+            },
+            upper: Item {
+                x: upper,
+                m: upper,
+                a: upper,
+                s: upper,
+            },
+        }
+    }
+
+    fn update_lower_bound(&mut self, variable: char, value: u32) {
+        let current = self.lower.get(variable);
+        if value > current {
+            self.lower.set(variable, value);
+        }
+    }
+
+    fn update_upper_bound(&mut self, variable: char, value: u32) {
+        let current = self.upper.get(variable);
+        if value < current {
+            self.upper.set(variable, value);
+        }
+    }
+
+    fn update(&mut self, condition: Condition) {
+        match condition {
+            Condition::Unconditional => {}
+            Condition::GreaterThan(variable, value) => {
+                // a condition like x > 10 means that the lower bound for x is 11
+                self.update_lower_bound(variable, value + 1);
+            }
+            Condition::LessThan(variable, value) => {
+                // a condition like x < 10 means that the upper bound for x is 9
+                self.update_upper_bound(variable, value - 1);
+            }
+        }
+    }
+}
+
+impl std::fmt::Display for Bounds {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "{{x=[{},{}],m=[{},{}],a=[{},{}],s=[{},{}]}}",
+            self.lower.x,
+            self.upper.x,
+            self.lower.m,
+            self.upper.m,
+            self.lower.a,
+            self.upper.a,
+            self.lower.s,
+            self.upper.s,
+        )
+    }
+}
+
+struct IteratePathsToAcceptance<'a> {
+    program: &'a Program,
+    stack: Vec<(u32, usize, Bounds)>,
+}
+
+impl<'a> IteratePathsToAcceptance<'a> {
+    fn new(program: &'a Program) -> Self {
+        Self {
+            program,
+            stack: vec![(program.entry_point, 0, Bounds::new(1, 4000))],
+        }
+    }
+}
+
+impl<'a> Iterator for IteratePathsToAcceptance<'a> {
+    type Item = Bounds;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        loop {
+            let (_workflow_index, workflow, rule_index, bounds) = loop {
+                let &(workflow_index, rule_index, ref bounds) = self.stack.last()?;
+                let workflow = &self.program.workflows[workflow_index as usize];
+                if rule_index == workflow.rules.len() {
+                    self.stack.pop();
+                } else {
+                    break (workflow_index, workflow, rule_index, bounds.clone());
+                }
+            };
+            self.stack.last_mut().unwrap().1 = rule_index + 1;
+            let rule = &workflow.rules[rule_index];
+
+            if rule.condition != Condition::Unconditional {
+                self.stack
+                    .last_mut()
+                    .unwrap()
+                    .2
+                    .update(rule.condition.invert());
+            }
+
+            let push_next = match rule.target {
+                Target::Accept => {
+                    let mut bounds = bounds.clone();
+                    bounds.update(rule.condition);
+                    return Some(bounds);
+                }
+                Target::Reject => None,
+                Target::Workflow(next_workflow) => {
+                    let mut bounds = bounds.clone();
+                    bounds.update(rule.condition);
+                    Some((next_workflow, bounds))
+                }
+            };
+
+            if let Some((next_workflow, bounds)) = push_next {
+                self.stack.push((next_workflow, 0, bounds.clone()));
+            }
+        }
+    }
+}
+
+fn find_paths_to_acceptance(
+    program: &Program,
+    workflow_index: u32,
+    paths: &mut Vec<Vec<Condition>>,
+    partial: Vec<Condition>,
+) {
+    let workflow = &program.workflows[workflow_index as usize];
+
+    let mut local_partial = partial.clone();
+
+    for rule in &workflow.rules {
+        match rule.target {
+            Target::Accept => {
+                let mut path = local_partial.clone();
+                path.push(rule.condition);
+                paths.push(path);
+            }
+            Target::Reject => {}
+            Target::Workflow(next_workflow) => {
+                let mut path = local_partial.clone();
+                path.push(rule.condition);
+                find_paths_to_acceptance(program, next_workflow, paths, path);
+            }
+        }
+
+        if rule.condition != Condition::Unconditional {
+            local_partial.push(rule.condition.invert());
+        }
+    }
+}
+
 #[aoc(day19, part2)]
-fn part2(_input: &Input) -> String {
-    todo!()
+fn part2(input: &Input) -> u64 {
+    let program = &input.program;
+    let mut paths = Vec::new();
+    find_paths_to_acceptance(program, program.entry_point, &mut paths, vec![]);
+
+    let mut total = 0;
+    for path in paths {
+        let mut bounds = Bounds::new(1, 4000);
+
+        for condition in path {
+            bounds.update(condition);
+        }
+        let x_diff = bounds.upper.x - bounds.lower.x + 1;
+        let m_diff = bounds.upper.m - bounds.lower.m + 1;
+        let a_diff = bounds.upper.a - bounds.lower.a + 1;
+        let s_diff = bounds.upper.s - bounds.lower.s + 1;
+        let count = x_diff as u64 * m_diff as u64 * a_diff as u64 * s_diff as u64;
+        total += count;
+    }
+    total
+}
+
+#[aoc(day19, part2, iterator)]
+fn part2_iterator(input: &Input) -> u64 {
+    let program = &input.program;
+    let mut total = 0;
+    for bounds in IteratePathsToAcceptance::new(program) {
+        let x_diff = bounds.upper.x - bounds.lower.x + 1;
+        let m_diff = bounds.upper.m - bounds.lower.m + 1;
+        let a_diff = bounds.upper.a - bounds.lower.a + 1;
+        let s_diff = bounds.upper.s - bounds.lower.s + 1;
+        let count = x_diff as u64 * m_diff as u64 * a_diff as u64 * s_diff as u64;
+        total += count;
+    }
+    total
 }
 
 #[cfg(test)]
-mod tests {}
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_part2() {
+        let input = parse(&unindent::unindent(
+            "
+                in{a>1:A,R}
+
+                {x=0,m=0,a=0,s=0}
+                ",
+        ));
+        let expected = 3999 * 4000 * 4000 * 4000; // 255936000000000
+        assert_eq!(part2(&input), expected);
+        assert_eq!(part2_iterator(&input), expected);
+    }
+
+    #[test]
+    fn test_part2_iter() {
+        let input = parse(&unindent::unindent(
+            "
+                in{a>2000:wf1,x>1:A}
+                wf1{m>1:A}
+
+                {x=0,m=0,a=0,s=0}
+                ",
+        ));
+        let expected = [
+            // a > 2000, m > 1
+            3999 * 2000 * 4000 * 4000,
+            // a <= 2000, x > 1
+            3999 * 2000 * 4000 * 4000,
+        ]
+        .iter()
+        .sum();
+        // let expected = 3999 * 4000 * 4000 * 4000 + 3999 * 2001 * 4000; // 255_999_984_000_000
+        assert_eq!(part2(&input), expected);
+        assert_eq!(part2_iterator(&input), expected);
+    }
+}
 
 example_tests! {
     "
@@ -227,9 +479,13 @@ example_tests! {
     {x=2127,m=1623,a=2188,s=1013}
     ",
     part1 => 19114,
+    part2 => 167409079868000,
+    part2_iterator => 167409079868000,
 }
 
 known_input_tests! {
     input: include_str!("../input/2023/day19.txt"),
     part1 => 456651,
+    part2 => 131899818301477,
+    part2_iterator => 131899818301477,
 }
