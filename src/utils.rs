@@ -221,6 +221,60 @@ macro_rules! grid_cell_enum {
 
 pub(crate) use grid_cell_enum;
 
+pub(crate) trait NumberExt {
+    fn greatest_common_divisor(self, other: Self) -> Self;
+    fn least_common_multiple(self, other: Self) -> Self;
+
+    fn zero() -> Self;
+    fn one() -> Self;
+}
+
+impl<T> NumberExt for T
+where
+    T: core::ops::Rem<Output = Self>
+        + core::ops::Div<Output = Self>
+        + Copy
+        + PartialOrd
+        + core::ops::Mul<Output = Self>
+        + From<bool>,
+{
+    // this is a bit of a hack: From<bool> is implemented for all primitive
+    // integers and provides 0 and 1 (sadly not const)
+    fn zero() -> Self {
+        false.into()
+    }
+    fn one() -> Self {
+        true.into()
+    }
+
+    fn greatest_common_divisor(self, other: Self) -> Self {
+        let mut a = self;
+        let mut b = other;
+        while b != Self::zero() {
+            let t = b;
+            b = a % b;
+            a = t;
+        }
+        a
+    }
+
+    fn least_common_multiple(self, other: Self) -> Self {
+        self * other / self.greatest_common_divisor(other)
+    }
+}
+
+pub(crate) trait NumberIteratorExt: Sized {
+    fn least_common_multiple(self) -> Self::Item
+    where
+        Self: Iterator,
+        Self::Item: NumberExt,
+    {
+        self.fold(Self::Item::one(), Self::Item::least_common_multiple)
+    }
+}
+
+impl<T> NumberIteratorExt for T where T: Iterator {}
+
 #[cfg(test)]
 mod tests {
     use super::*;
