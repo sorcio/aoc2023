@@ -2,7 +2,10 @@ use std::collections::HashMap;
 
 use aoc_runner_derive::{aoc, aoc_generator};
 
-use crate::testing::{example_tests, known_input_tests};
+use crate::{
+    testing::{example_tests, known_input_tests},
+    utils::NumberIteratorExt,
+};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 struct NodeId(usize);
@@ -174,21 +177,6 @@ fn part1(input: &Day8Map) -> usize {
     total_steps
 }
 
-fn greatest_common_divisor(a: usize, b: usize) -> usize {
-    let mut a = a;
-    let mut b = b;
-    while b != 0 {
-        let t = b;
-        b = a % b;
-        a = t;
-    }
-    a
-}
-
-fn least_common_multiple(a: usize, b: usize) -> usize {
-    a * b / greatest_common_divisor(a, b)
-}
-
 #[aoc(day8, part2)]
 fn part2(input: &Day8Map) -> usize {
     let sequence = &input.sequence;
@@ -214,7 +202,7 @@ fn part2(input: &Day8Map) -> usize {
             }
             total_steps
         })
-        .fold(1, least_common_multiple)
+        .least_common_multiple()
 }
 
 #[aoc(day8, part2, brute_force)]
